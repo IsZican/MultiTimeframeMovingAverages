@@ -131,17 +131,23 @@ fill(p1M, t1M, color.new(col1M, velTransp))
 
 // Crossover table: bullish = faster EMA above slower EMA (last cross was up),
 // bearish = faster below slower (last cross was down), gray n/a = missing data
+// "turning" = the faster EMA's projection (EMA + velocity * strength) is on the other side
+// of the slower EMA's current value
 var table t = table.new(tblPos, 2, 6, border_width=1)
 if barstate.islast and showTable
     pairs = array.from("1/5", "5/H", "H/D", "D/W", "D/M", "W/M")
     fast  = array.from(ema1m, ema5m, ema1h, ema1d, ema1d, ema1w)
+    fvel  = array.from(vel1m, vel5m, vel1h, vel1d, vel1d, vel1w)
     slow  = array.from(ema5m, ema1h, ema1d, ema1w, ema1M, ema1M)
     for i = 0 to 5
         f = fast.get(i)
         sl = slow.get(i)
+        fv = fvel.get(i)
         missing = na(f) or na(sl)
         bull = f > sl
-        txt = missing ? "n/a" : (bull ? "bullish" : "bearish")
+        proj = f + fv * velStrength
+        turning = not missing and not na(proj) and (bull ? proj < sl : proj > sl)
+        txt = missing ? "n/a" : ((bull ? "bullish" : "bearish") + (turning ? " · turning" : ""))
         bg = color.new(missing ? color.gray : (bull ? color.green : color.red), tblTransp)
         table.cell(t, 0, i, pairs.get(i), text_color=color.white, bgcolor=bg)
         table.cell(t, 1, i, txt, text_color=color.white, bgcolor=bg)

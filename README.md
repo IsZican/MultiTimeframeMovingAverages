@@ -25,7 +25,7 @@ On top of the lines it adds:
 | Per-line settings | Checkbox and color for every EMA, laid out in 3 rows |
 | Adaptive timeframe | Automatically hides the smaller timeframes on higher charts |
 | Velocity fill | Fills the space between each EMA and `EMA + velocity * strength` |
-| Crossover table | Bullish / bearish / n/a for 6 EMA pairs, with adjustable position and transparency |
+| Crossover table | Bullish / bearish / n/a for 6 EMA pairs, with a "turning" warning and adjustable position and transparency |
 | Manual fallback | Lets you type W/M EMA values per ticker when TradingView does not load enough bars |
 
 ---
@@ -110,6 +110,13 @@ Each row is colored:
 - **Green, "bullish"**: the smaller-timeframe EMA is above the larger one (it last crossed up).
 - **Red, "bearish"**: the smaller-timeframe EMA is below the larger one (it last crossed down).
 - **Gray, "n/a"**: one of the two EMAs has no data.
+
+A "**turning**" tag is added to bullish or bearish when the smaller EMA's projection (`EMA + velocity * strength`, the same value used by the velocity fill) is on the other side of the larger EMA's **current** value:
+
+- **Bullish · turning**: the smaller EMA is above the larger one, but its projection is below it.
+- **Bearish · turning**: the smaller EMA is below the larger one, but its projection is above it.
+
+The row color does not change. The check uses the **Velocity strength** setting even if the velocity fill is turned off, so a higher strength flags turning earlier and more often. It is not shown for rows that use a manual W/M value, since those have no velocity.
 
 The table shows the *current state*, not only the moment of the cross. It ignores the checkboxes and the adaptive option, so a pair is shown even if one of its lines is hidden.
 
