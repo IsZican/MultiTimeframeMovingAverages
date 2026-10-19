@@ -1,0 +1,147 @@
+//@version=6
+indicator("Multi-Timeframe EMA", shorttitle="T", overlay=true)
+
+len = input.int(27, "EMA Length", minval=1)
+// Per-timeframe settings
+show1m = input.bool(true, "1", group="EMAs", inline="r1")
+col1m  = input.color(color.new(#ffeb3b, 0), "", group="EMAs", inline="r1")
+show5m = input.bool(true, "5", group="EMAs", inline="r1")
+col5m  = input.color(color.new(#1565c0, 0), "", group="EMAs", inline="r1")
+show15m = input.bool(true, "15", group="EMAs", inline="r1")
+col15m  = input.color(color.new(#9e9e9e, 0), "", group="EMAs", inline="r1")
+show1h = input.bool(true, "H", group="EMAs", inline="r2")
+col1h  = input.color(color.new(#9c27b0, 0), "", group="EMAs", inline="r2")
+show4h = input.bool(true, "4H", group="EMAs", inline="r2")
+col4h  = input.color(color.new(#00bcd4, 0), "", group="EMAs", inline="r2")
+show1d = input.bool(true, "D", group="EMAs", inline="r2")
+col1d  = input.color(color.new(#ffffff, 0), "", group="EMAs", inline="r2")
+show1w = input.bool(true, "W", group="EMAs", inline="r3")
+col1w  = input.color(color.new(#4caf50, 0), "", group="EMAs", inline="r3")
+show1M = input.bool(true, "M", group="EMAs", inline="r3")
+col1M  = input.color(color.new(#f44336, 0), "", group="EMAs", inline="r3")
+
+// Adaptive timeframe: hide smaller timeframes on higher charts
+adaptive = input.bool(true, "Adaptive timeframe (hide smaller timeframes on higher charts)", group="EMAs")
+cs = timeframe.in_seconds()
+hide1m  = adaptive and cs >= 900     // chart 15m or higher
+hide5m  = adaptive and cs >= 3600    // chart 1H or higher
+hide15m = adaptive and cs >= 3600    // chart 1H or higher
+hide1h  = adaptive and cs >= 86400   // chart 1D or higher
+hide4h  = adaptive and cs >= 604800  // chart 1W or higher
+
+// Velocity settings
+showVel = input.bool(true, "Show velocity fill", group="Velocity")
+velStrength = input.float(5.0, "Velocity strength", minval=0.0, step=0.5, group="Velocity")
+velTransp = input.int(85, "Velocity transparency (0-100)", minval=0, maxval=100, group="Velocity")
+
+// Table settings
+showTable = input.bool(true, "Show crossover table", group="Table")
+tblPosStr = input.string("Top Right", "Table position", options=["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right"], group="Table")
+tblPos = switch tblPosStr
+    "Top Left"      => position.top_left
+    "Top Center"    => position.top_center
+    "Top Right"     => position.top_right
+    "Middle Left"   => position.middle_left
+    "Middle Center" => position.middle_center
+    "Middle Right"  => position.middle_right
+    "Bottom Left"   => position.bottom_left
+    "Bottom Center" => position.bottom_center
+    "Bottom Right"  => position.bottom_right
+tblTransp = input.int(65, "Table transparency (0-100)", minval=0, maxval=100, group="Table")
+
+manualText = input.text_area("BTCUSDT,0,0", "Manual fallback values (one ticker per line: TICKER,1W,1M)", group="Manual fallback", tooltip="Used for 1W/1M when the EMA is n/a (not enough bars loaded). Matches the ticker without exchange (e.g. BTCUSDT). Values of 0 or text are ignored.")
+
+f_manual(col) =>
+    float res = na
+    for l in str.split(manualText, "\n")
+        parts = str.split(l, ",")
+        if parts.size() >= 3 and str.upper(str.trim(parts.get(0))) == str.upper(syminfo.ticker)
+            v = str.tonumber(str.trim(parts.get(col)))
+            res := (not na(v) and v > 0) ? v : na
+    res
+
+man1w = f_manual(1)
+man1M = f_manual(2)
+
+// EMA and velocity, both measured on the timeframe's own last two CLOSED candles
+// velocity = EMA of last closed candle - EMA of the candle before it
+f_pair() =>
+    e = ta.ema(close, len)
+    [e[1], e[1] - e[2]]
+
+f_ema(tf) =>
+    request.security(syminfo.tickerid, tf, f_pair(), lookahead=barmerge.lookahead_on)
+
+[ema1m,  vel1m]  = f_ema("1")
+[ema5m,  vel5m]  = f_ema("5")
+[ema15m, vel15m] = f_ema("15")
+[ema1h,  vel1h]  = f_ema("60")
+[ema4h,  vel4h]  = f_ema("240")
+[ema1d,  vel1d]  = f_ema("D")
+[ema1w,  vel1w]  = f_ema("W")
+[ema1M,  vel1M]  = f_ema("M")
+
+// If W/M is n/a (not enough bars loaded), use the manual value for this ticker
+// (no velocity is available for manual values, so no fill is drawn)
+ema1w := na(ema1w) ? man1w : ema1w
+ema1M := na(ema1M) ? man1M : ema1M
+
+// Visibility of each line
+vis1m  = show1m and not hide1m
+vis5m  = show5m and not hide5m
+vis15m = show15m and not hide15m
+vis1h  = show1h and not hide1h
+vis4h  = show4h and not hide4h
+vis1d  = show1d
+vis1w  = show1w
+vis1M  = show1M
+
+// EMA lines, hidden "target" lines (EMA + velocity * strength) and the fills between them
+p1m  = plot(vis1m  ? ema1m  : na, "1",  col1m,  2)
+t1m  = plot(vis1m  and showVel ? ema1m  + vel1m  * velStrength : na, "1 target",  display=display.none)
+fill(p1m, t1m, color.new(col1m, velTransp))
+
+p5m  = plot(vis5m  ? ema5m  : na, "5",  col5m,  2)
+t5m  = plot(vis5m  and showVel ? ema5m  + vel5m  * velStrength : na, "5 target",  display=display.none)
+fill(p5m, t5m, color.new(col5m, velTransp))
+
+p15m = plot(vis15m ? ema15m : na, "15", col15m, 2)
+t15m = plot(vis15m and showVel ? ema15m + vel15m * velStrength : na, "15 target", display=display.none)
+fill(p15m, t15m, color.new(col15m, velTransp))
+
+p1h  = plot(vis1h  ? ema1h  : na, "H",  col1h,  2)
+t1h  = plot(vis1h  and showVel ? ema1h  + vel1h  * velStrength : na, "H target",  display=display.none)
+fill(p1h, t1h, color.new(col1h, velTransp))
+
+p4h  = plot(vis4h  ? ema4h  : na, "4H", col4h,  2)
+t4h  = plot(vis4h  and showVel ? ema4h  + vel4h  * velStrength : na, "4H target", display=display.none)
+fill(p4h, t4h, color.new(col4h, velTransp))
+
+p1d  = plot(vis1d  ? ema1d  : na, "D",  col1d,  2)
+t1d  = plot(vis1d  and showVel ? ema1d  + vel1d  * velStrength : na, "D target",  display=display.none)
+fill(p1d, t1d, color.new(col1d, velTransp))
+
+p1w  = plot(vis1w  ? ema1w  : na, "W",  col1w,  2)
+t1w  = plot(vis1w  and showVel ? ema1w  + vel1w  * velStrength : na, "W target",  display=display.none)
+fill(p1w, t1w, color.new(col1w, velTransp))
+
+p1M  = plot(vis1M  ? ema1M  : na, "M",  col1M,  2)
+t1M  = plot(vis1M  and showVel ? ema1M  + vel1M  * velStrength : na, "M target",  display=display.none)
+fill(p1M, t1M, color.new(col1M, velTransp))
+
+// Crossover table: bullish = faster EMA above slower EMA (last cross was up),
+// bearish = faster below slower (last cross was down), gray n/a = missing data
+var table t = table.new(tblPos, 2, 6, border_width=1)
+if barstate.islast and showTable
+    pairs = array.from("1/5", "5/H", "H/D", "D/W", "D/M", "W/M")
+    fast  = array.from(ema1m, ema5m, ema1h, ema1d, ema1d, ema1w)
+    slow  = array.from(ema5m, ema1h, ema1d, ema1w, ema1M, ema1M)
+    for i = 0 to 5
+        f = fast.get(i)
+        sl = slow.get(i)
+        missing = na(f) or na(sl)
+        bull = f > sl
+        txt = missing ? "n/a" : (bull ? "bullish" : "bearish")
+        bg = color.new(missing ? color.gray : (bull ? color.green : color.red), tblTransp)
+        table.cell(t, 0, i, pairs.get(i), text_color=color.white, bgcolor=bg)
+        table.cell(t, 1, i, txt, text_color=color.white, bgcolor=bg)
