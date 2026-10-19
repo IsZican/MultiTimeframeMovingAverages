@@ -13,6 +13,8 @@ On top of the lines it adds:
 
 ---
 
+<img src="images/daily.png" width="50%" /> <img src="images/5min.png" width="50%" />
+
 ## Features
 
 | Feature | What it does |
